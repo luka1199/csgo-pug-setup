@@ -414,7 +414,7 @@ public int Native_SetRandomCaptains(Handle plugin, int numParams) {
   int c2 = -1;
 
   c1 = RandomPlayer();
-  while (!IsPlayer(c2) || c1 == c2) {
+  while (!IsPlayer(c2) || c1 == c2 || GetClientTeam(c1) == GetClientTeam(c2)) {
     if (GetRealClientCount() < 2)
       break;
 

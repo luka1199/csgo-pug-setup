@@ -137,6 +137,7 @@ ArrayList g_Commands;  // just a list of all known pugsetup commands
 
 /** Map-choosing variables **/
 ArrayList g_MapVetoed;
+ArrayList g_MapPicked;
 ArrayList g_MapVotePool;
 
 /** Data about team selections **/
@@ -160,6 +161,17 @@ enum KnifeDecision {
 };
 KnifeDecision g_KnifeRoundVotes[MAXPLAYERS + 1];
 int g_KnifeNumVotesNeeded = 0;
+
+/** Wingman Cup stuff **/
+int bestOfX = 1;
+int seriesVoteIndex = 0;
+int seriesMapIndex = 0;
+char seriesVoteTypeBo3[7] = "bbbbppr";
+char seriesVoteTeamBo3[7] = "1221123";
+char seriesVoteTypeBo5[9] = "bbbbppppr";
+char seriesVoteTeamBo5[9] = "122112213";
+ArrayList seriesMaps;
+
 
 /** Forwards **/
 Handle g_OnForceEnd = INVALID_HANDLE;
@@ -395,6 +407,16 @@ public void OnPluginStart() {
                      "Sets whether a setup option will be displayed", Permission_Admin);
   AddPugSetupCommand("readymessage", Command_ReadyMessage, "Sets your ready message",
                      Permission_All);
+  AddPugSetupCommand("reset", Command_Reset, "Clears the list of excluded maps.",
+                     Permission_Admin);
+  AddPugSetupCommand("bo1", Command_Bo1, "Sets series to BO1.",
+                     Permission_Admin);
+  AddPugSetupCommand("bo3", Command_Bo3, "Sets series to BO3.",
+                     Permission_Admin);
+  AddPugSetupCommand("bo5", Command_Bo5, "Sets series to BO5.",
+                     Permission_Admin);
+  AddPugSetupCommand("exclude", Command_Exclude, "Manually excludes map given in argument.",
+                     Permission_Admin);
   LoadExtraAliases();
 
   RegConsoleCmd("pugstatus", Command_Pugstatus, "Dumps information about the pug game status");
@@ -454,6 +476,8 @@ public void OnPluginStart() {
 
   g_MapVotePool = new ArrayList(PLATFORM_MAX_PATH);
   g_PastMaps = new ArrayList(PLATFORM_MAX_PATH);
+
+  seriesMaps = new ArrayList(PLATFORM_MAX_PATH);
 
   // Get workshop cache file setup
   BuildPath(Path_SM, g_DataDir, sizeof(g_DataDir), "data/pugsetup");
@@ -534,6 +558,9 @@ public void OnMapStart() {
 
   g_ForceEnded = false;
   g_MapVetoed = new ArrayList();
+  g_MapPicked = new ArrayList();
+  seriesVoteIndex = 0;
+  seriesMapIndex = 0;
   g_Recording = false;
   g_LiveTimerRunning = false;
   g_ForceStartSignal = false;
@@ -561,9 +588,27 @@ public void OnMapStart() {
 
 public void OnMapEnd() {
   CloseHandle(g_MapVetoed);
+  CloseHandle(g_MapPicked);
   g_WorkshopCache.Rewind();
   g_WorkshopCache.ExportToFile(g_CacheFile);
   delete g_WorkshopCache;
+
+  if (bestOfX == 3) {
+    seriesMapIndex++
+    if (seriesMapIndex > 2) {
+      // Series over
+    } else {
+      // Next map
+    }
+    
+  } else if (bestOfX == 5) {
+    seriesMapIndex++
+    if (seriesMapIndex > 4) {
+      // Series over
+    } else {
+      // Next map
+    }
+  }
 }
 
 public bool UsingCaptains() {
@@ -898,6 +943,102 @@ public Action Command_Capt(int client, int args) {
   } else {
     Captain1Menu(client);
   }
+  return Plugin_Handled;
+}
+
+public Action Command_Reset(int client, int args) {
+  if (!DoPermissionCheck(client, "sm_reset")) {
+    if (IsValidClient(client))
+      PugSetup_Message(client, "%t", "NoPermission");
+    return Plugin_Handled;
+  }
+
+  // Clear list of excluded maps
+  g_PastMaps = new ArrayList(PLATFORM_MAX_PATH);
+  seriesMaps = new ArrayList(PLATFORM_MAX_PATH);
+  g_MapVetoed = new ArrayList();
+  g_MapPicked = new ArrayList();
+  seriesVoteIndex = 0;
+  seriesMapIndex = 0;
+  PugSetup_Message(client, "List of excluded maps cleared.");
+  return Plugin_Handled;
+}
+
+public Action Command_Bo1(int client, int args) {
+  if (!DoPermissionCheck(client, "sm_bo1")) {
+    if (IsValidClient(client))
+      PugSetup_Message(client, "%t", "NoPermission");
+    return Plugin_Handled;
+  }
+
+  PugSetup_Message(client, "Set to BO1.");
+  bestOfX = 1;
+  return Plugin_Handled;
+}
+
+public Action Command_Bo3(int client, int args) {
+  if (!DoPermissionCheck(client, "sm_bo3")) {
+    if (IsValidClient(client))
+      PugSetup_Message(client, "%t", "NoPermission");
+    return Plugin_Handled;
+  }
+
+  PugSetup_Message(client, "Set to BO3.");
+  bestOfX = 3;
+  return Plugin_Handled;
+}
+
+public Action Command_Bo5(int client, int args) {
+  if (!DoPermissionCheck(client, "sm_bo5")) {
+    if (IsValidClient(client))
+      PugSetup_Message(client, "%t", "NoPermission");
+    return Plugin_Handled;
+  }
+
+  PugSetup_Message(client, "Set to BO5.");
+  bestOfX = 5;
+  return Plugin_Handled;
+}
+
+public Action Command_Exclude(int client, int args) {
+  if (!DoPermissionCheck(client, "sm_exclude")) {
+    if (IsValidClient(client))
+      PugSetup_Message(client, "%t", "NoPermission");
+    return Plugin_Handled;
+  }
+
+  if (args < 1) {
+    PugSetup_Message(client, "Usage: !exclude <map>");
+    ClearArray(g_MapVetoed);
+    ClearArray(g_MapPicked);
+    seriesVoteIndex = 0;
+    for (int i = 0; i < g_MapList.Length; i++) {
+      g_MapVetoed.Push(false);
+      g_MapPicked.Push(false);
+    }
+
+    g_capt1 = client;
+    GiveSeriesMenu(client);
+    // char mapName[PLATFORM_MAX_PATH];
+    // PugSetup_Message(client, "Excluded maps:");
+    // for(int i = 0; i < g_PastMaps.Length; i++)
+    // {
+    //   g_PastMaps.GetString(i, mapName, sizeof(mapName));
+    //   PugSetup_Message(client, "%s", mapName);
+    // }
+    // PugSetup_Message(client, "\nMap pool:");
+    // for(int i = 0; i < g_MapVotePool.Length; i++)
+    // {
+    //   g_MapVotePool.GetString(i, mapName, sizeof(mapName));
+    //   PugSetup_Message(client, "%s", mapName);
+    // }
+    return Plugin_Handled;
+  }
+
+  char map[PLATFORM_MAX_PATH];
+  GetCmdArg(1, map, sizeof(map));
+  PugSetup_Message(client, "Excluded %s.", map);
+  g_PastMaps.PushString(map);
   return Plugin_Handled;
 }
 
@@ -1594,7 +1735,8 @@ public Action Event_MatchOver(Event event, const char[] name, bool dontBroadcast
   }
 
   if (g_PastMaps.Length > g_ExcludedMaps.IntValue) {
-    g_PastMaps.Erase(0);
+    // g_PastMaps.Erase(0);
+    g_PastMaps = new ArrayList(PLATFORM_MAX_PATH);
   }
 
   return Plugin_Continue;
@@ -2014,6 +2156,10 @@ public Action MapSetup(Handle timer) {
   if (g_MapType == MapType_Vote) {
     CreateMapVote();
   } else if (g_MapType == MapType_Veto) {
+    if (bestOfX > 1) {
+      CreateSeriesVote();
+      return Plugin_Handled;
+    }
     CreateMapVeto();
   } else {
     LogError("Unexpected map type in MapSetup=%d", g_MapType);

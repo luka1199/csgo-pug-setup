@@ -95,7 +95,7 @@ stock int RandomPlayer(int exclude = -1) {
   ArrayList clients = new ArrayList();
 
   for (int i = 1; i <= MaxClients; i++) {
-    if (IsPlayer(i) && i != exclude) {
+    if (IsPlayer(i) && GetClientTeam(i) != 1 && i != exclude) {
       clients.Push(i);
     }
   }
